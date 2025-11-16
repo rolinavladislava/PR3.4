@@ -1,166 +1,126 @@
-const $btnKick = document.getElementById("btn-kick");
-const $btnQuick = document.getElementById("btn-quick");
-const $logs = document.getElementById("logs");
+const logsDiv = document.createElement("div");
+logsDiv.id = "logs";
+document.body.appendChild(logsDiv); 
 
-function createPlayer({ name, elHPId, elProgressbarId, defaultHP = 100 }) {
-  const elHP = document.getElementById(elHPId);
-  const elProgressbar = document.getElementById(elProgressbarId);
+function createCharacter(id, name) {
+  const elementHP = document.getElementById(`health-${id}`);
+  const elementBar = document.getElementById(`progressbar-${id}`);
+  const maxHp = 100;
+
+  function updateHp() {
+    const { hp, elementHP, elementBar } = this;
+    elementBar.style.width = (hp / maxHp * 100) + "%";
+    elementHP.textContent = `${hp} / ${maxHp}`;
+    elementBar.style.background =
+      hp > 75 ? "lime" :
+      hp > 50 ? "yellow" :
+      hp > 20 ? "orange" : "red";
+  }
+
+  function attack(defender, minDamage = 2, maxDamage = 15) {
+    const { name: attackerName } = this;
+    const { name: defenderName } = defender;
+    const damage = Math.floor(Math.random() * (maxDamage - minDamage + 1)) + minDamage;
+    defender.hp = Math.max(0, defender.hp - damage);
+    defender.updateHp();
+
+    const logText = `${attackerName} атакує ${defenderName} на ${damage} урона! ${defenderName} має ${defender.hp} HP.`;
+
+    const type = this === character ? "hero" : "enemy";
+    addLog(logText, type);
+  }
 
   return {
     name,
-    defaultHP,
-    damageHP: defaultHP,
-    lost: false,
-    elHP,
-    elProgressbar,
-
-    renderHPLife() {
-      const { elHP, damageHP, defaultHP } = this;
-      elHP.innerText = `${damageHP} / ${defaultHP}`;
-    },
-
-    renderProgressbarHP() {
-      const { elProgressbar, damageHP } = this;
-      elProgressbar.style.width = damageHP + "%";
-      if (damageHP > 60) {
-        elProgressbar.style.background = "#4CAF50";
-      } else if (damageHP > 30) {
-        elProgressbar.style.background = "#FF9800";
-      } else {
-        elProgressbar.style.background = "#F44336";
-      }
-    },
-
-    renderHP() {
-      this.renderHPLife();
-      this.renderProgressbarHP();
-    },
-    changeHP(count) {
-      const { damageHP } = this;
-      const actual = Math.min(count, damageHP);
-      this.damageHP = Math.max(0, damageHP - count);
-      this.renderHP();
-
-      if (this.damageHP === 0 && !this.lost) {
-        this.lost = true;
-        alert(`Бідний ${this.name} програв бій!`);
-      }
-
-      return actual;
-    },
+    hp: maxHp,
+    maxHp,
+    elementHP,
+    elementBar,
+    updateHp,
+    attack,
   };
 }
 
-const character = createPlayer({
-  name: "Pikachu",
-  elHPId: "health-character",
-  elProgressbarId: "progressbar-character",
-});
+const character = createCharacter("character", "Pikachu");
+const enemy = createCharacter("enemy", "Charmander");
+const enemy2 = createCharacter("enemy2", "Meowth");
 
-const enemy1 = createPlayer({
-  name: "Charmander",
-  elHPId: "health-enemy1",
-  elProgressbarId: "progressbar-enemy1",
-});
+function addLog(message, type = "neutral") {
+  const logs = document.getElementById("logs");
+  const p = document.createElement("p");
+  p.textContent = message;
 
-const enemy2 = createPlayer({
-  name: "Bulbasaur",
-  elHPId: "health-enemy2",
-  elProgressbarId: "progressbar-enemy2",
-});
+  if (type === "hero") {
+    p.style.color = "lime";
+  } else if (type === "enemy") {
+    p.style.color = "red";
+  } else {
+    p.style.color = "white";
+  }
 
-function random(num) {
-  return Math.ceil(Math.random() * num);
+  logs.prepend(p);
 }
 
-const logs = [];
-
-function addLog({
-  attacker,
-  target,
-  damage,
-  remaining,
-  remainingButtons = null,
-  note = "",
-}) {
-  const time = new Date().toLocaleTimeString();
-  const hpPart =
-    typeof remaining === "number" ? `Залишилося: ${remaining} / 100` : "";
-  const btnPart =
-    remainingButtons !== null
-      ? ` | Натискань залишилося: ${remainingButtons}`
-      : "";
-  const text = `${time} — ${attacker}${target ? ` атакував ${target}` : ""}${
-    damage ? ` і наніс ${damage} урона.` : "."
-  } ${hpPart}${btnPart}${note ? ` ${note}` : ""}`;
-  logs.unshift(text);
-  renderLogs();
+function showResult(message) {
+  const screen = document.getElementById("Result_Window");
+  const text = document.getElementById("Result_Text");
+  text.textContent = message;
+  screen.style.display = "flex";
 }
 
-const renderLogs = () => {
-  $logs.innerHTML = logs
-    .map(
-      (t) =>
-        `<div class="log" style="padding:6px;border-bottom:1px solid #eee;">${t}</div>`
-    )
-    .join("");
+function Winner() {
+  const { hp: chHp, name: chName } = character;
+  const { hp: enHp, name: enName } = enemy;
+
+  if (chHp === 0 && enHp === 0) {
+    showResult("Нічия!");
+    addLog("Нічия!");
+    return true;
+  }
+  if (chHp === 0) {
+    showResult(`🎉 ${enName} Переміг! 🎉`);
+    addLog(`${enName} виграв бій!`);
+    return true;
+  }
+  if (enHp === 0) {
+    showResult(`🎉 ${chName} Переміг! 🎉`);
+    addLog(`${chName} виграв бій!`);
+    return true;
+  }
+  return false;
 }
 
-function attack(attacker, target, maxDamage) {
-  const damage = target.changeHP(random(maxDamage));
-  addLog({
-    attacker: attacker.name,
-    target: target.name,
-    damage,
-    remaining: target.damageHP,
-  });
-}
-
-const createClickLimiter = (maxClicks = 7) => {
+const clickCounter = (limit = 6) => {
   let count = 0;
-  return function () {
-    count += 1;
-    const remaining = Math.max(0, maxClicks - count);
-    const allowed = count <= maxClicks;
-    return { allowed, total: count, remaining };
-  };
-}
-
-document.querySelectorAll(".button").forEach((btn) => {
-  const limit = createClickLimiter(7);
-  const btnName = btn.id || btn.innerText.trim() || "button";
-  btn.addEventListener("click", (e) => {
-    const { allowed, total, remaining } = limit();
-    console.log(`${btnName} clicked: ${total}. Remaining: ${remaining}`);
-    addLog({
-      attacker: btnName,
-      target: "",
-      damage: 0,
-      remaining: null,
-      remainingButtons: remaining,
-      note: allowed ? "" : "(ліміт досягнутий)",
-    });
-
-    if (!allowed) {
-      btn.disabled = true;
-      return;
-    }
-    if (btn.id === "btn-kick") {
-      attack(character, enemy1, 20);
-      attack(character, enemy2, 20);
-    } else if (btn.id === "btn-quick") {
-      attack(character, enemy1, 10);
-      attack(character, enemy2, 10);
+  return (btn) => {
+    if (count < limit) {
+      count++;
+      const remaining = limit - count;
+      btn.textContent = `Клік ${count} (залишилось ${remaining})`;
     } else {
+      btn.textContent = `Ліміт ${limit} вичерпано`;
+      btn.disabled = true;
     }
-  });
+  };
+};
+
+document.querySelectorAll("button").forEach(btn => {
+  const handleClick = clickCounter(6);
+  btn.addEventListener("click", () => handleClick(btn));
 });
 
-const init = () => {
-  character.renderHP();
-  enemy1.renderHP();
-  enemy2.renderHP();
-  renderLogs();
-}
+document.getElementById("dbtn-kick").addEventListener("click", () => {
+  character.attack(enemy);
+  enemy.attack(character);
+  if (Winner()) return;
+});
 
-init();
+document.getElementById("kbtn-kick").addEventListener("click", () => {
+  character.attack(enemy, 10, 25);
+  enemy.attack(character, 5, 15);
+  if (Winner()) return;
+});
+
+document.getElementById("Restart_Button").addEventListener("click", () => {
+  location.reload();
+});
